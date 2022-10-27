@@ -12,7 +12,7 @@ use tokio::time::sleep;
 pub trait World {
     /// Returns a greeting for name.
     async fn snapshot_and_resume(cpu_snapshot_path: String, memory_snapshot_path: String, port: u16) -> String;
-    async fn snapshot_and_pause(cpu_snapshot_path: String, memory_snapshot_path: String, port: u16) -> String;
+    async fn snapshot_and_pause(cpu_snapshot_path: String, memory_snapshot_path: String, port: u16, resume: bool) -> String;
 }
 
 // use rocket_okapi::gen::OpenApiGenerator;
@@ -147,18 +147,18 @@ async fn rpc_call(body: Json<SnapshotRequest<'_>>) -> anyhow::Result<String> {
     let client = WorldClient::new(client::Config::default(), transport.await?).spawn();
     let hello = async move {
         // Send the request twice, just to be safe! ;)
-        if body.resume{
+        // if body.resume{
+        //     tokio::select! {
+        //         hello1 = client.snapshot_and_resume(context::current(), body.cpu_snapshot_path.to_string(), body.memory_snapshot_path.to_string(), body.rpc_port) => { hello1 }
+        //         // hello2 = client.hello(context::current(), format!("{}2", "Ronak")) => { hello2 }
+        //     }
+        // }
+        // else{
             tokio::select! {
-                hello1 = client.snapshot_and_resume(context::current(), body.cpu_snapshot_path.to_string(), body.memory_snapshot_path.to_string(), body.rpc_port) => { hello1 }
+                hello1 = client.snapshot_and_pause(context::current(), body.cpu_snapshot_path.to_string(), body.memory_snapshot_path.to_string(), body.rpc_port, body.resume) => { hello1 }
                 // hello2 = client.hello(context::current(), format!("{}2", "Ronak")) => { hello2 }
             }
-        }
-        else{
-            tokio::select! {
-                hello1 = client.snapshot_and_pause(context::current(), body.cpu_snapshot_path.to_string(), body.memory_snapshot_path.to_string(), body.rpc_port) => { hello1 }
-                // hello2 = client.hello(context::current(), format!("{}2", "Ronak")) => { hello2 }
-            }
-        }
+        // }
     }.await;
     match hello {
         Ok(s) => {

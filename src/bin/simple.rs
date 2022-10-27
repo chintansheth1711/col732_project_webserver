@@ -1,25 +1,29 @@
-#[macro_use] extern crate rocket;
+#[macro_use]
+extern crate rocket;
 
-use rocket::http::Status;
-use rocket::serde::{Serialize, Deserialize, json::Json};
-use fork::{fork, Fork};
 use exec::Command;
-use std::{error::Error, net::SocketAddr, time::Duration, net::IpAddr, net::Ipv4Addr};
+use fork::{fork, Fork};
+use rocket::http::Status;
+use rocket::serde::{json::Json, Deserialize, Serialize};
+use std::{error::Error, net::IpAddr, net::Ipv4Addr, net::SocketAddr, time::Duration};
 use tarpc::{client, context, tokio_serde::formats::Json as newJson};
 use tokio::time::sleep;
 
 #[tarpc::service]
 pub trait World {
     /// Returns a greeting for name.
-    async fn snapshot_and_resume(cpu_snapshot_path: String, memory_snapshot_path: String, port: u16) -> String;
-    async fn snapshot_and_pause(cpu_snapshot_path: String, memory_snapshot_path: String, port: u16) -> String;
+    async fn snapshot_and_resume(
+        cpu_snapshot_path: String,
+        memory_snapshot_path: String,
+        port: u16,
+    ) -> String;
+    async fn snapshot_and_pause(
+        cpu_snapshot_path: String,
+        memory_snapshot_path: String,
+        port: u16,
+        resume: bool,
+    ) -> String;
 }
-
-// use rocket_okapi::gen::OpenApiGenerator;
-// use rocket_okapi::okapi;
-// use rocket_okapi::okapi::openapi3::{MediaType, Responses};
-// use rocket_okapi::response::OpenApiResponderInner;
-// use rocket_okapi::OpenApiError;
 
 /// error type
 #[derive(Debug, Serialize, schemars::JsonSchema)]
@@ -57,42 +61,6 @@ impl MyError {
     }
 }
 
-// /// Create my custom response
-// pub fn bad_request_response(gen: &mut OpenApiGenerator) -> okapi::openapi3::Response {
-//     let schema = gen.json_schema::<MyError>();
-//     okapi::openapi3::Response {
-//         description: "\
-//         # 400 Bad Request\n\
-//         The request given is wrongly formatted or data was missing. \
-//         "
-//         .to_owned(),
-//         content: okapi::map! {
-//             "application/json".to_owned() => MediaType {
-//                 schema: Some(schema),
-//                 ..Default::default()
-//             }
-//         },
-//         ..Default::default()
-//     }
-// }
-
-// pub fn unauthorized_response(gen: &mut OpenApiGenerator) -> okapi::openapi3::Response {
-//     let schema = gen.json_schema::<MyError>();
-//     okapi::openapi3::Response {
-//         description: "\
-//         # 401 Unauthorized\n\
-//         The authentication given was incorrect or insufficient. \
-//         "
-//         .to_owned(),
-//         content: okapi::map! {
-//             "application/json".to_owned() => MediaType {
-//                 schema: Some(schema),
-//                 ..Default::default()
-//             }
-//         },
-//         ..Default::default()
-//     }
-// }
 
 impl<'r> rocket::response::Responder<'r, 'static> for MyError {
     fn respond_to(self, _: &'r rocket::Request<'_>) -> rocket::response::Result<'static> {
@@ -106,40 +74,23 @@ impl<'r> rocket::response::Responder<'r, 'static> for MyError {
     }
 }
 
-// impl OpenApiResponderInner for MyError {
-//     fn responses(gen: &mut OpenApiGenerator) -> Result<Responses, OpenApiError> {
-//         use rocket_okapi::okapi::openapi3::RefOr;
-//         Ok(Responses {
-//             responses: okapi::map! {
-//                 "400".to_owned() => RefOr::Object(bad_request_response(gen)),
-//                 // Note: 401 is already declared for ApiKey. so this is not essential.
-//                 // "401".to_owned() => RefOr::Object(unauthorized_response(gen)),
-//             },
-//             ..Default::default()
-//         })
-//     }
-// }
-
-
 #[derive(Deserialize, Debug)]
 #[serde(crate = "rocket::serde")]
 struct SnapshotRequest<'a> {
-    cpu_snapshot_path : &'a str,
-    memory_snapshot_path : &'a str,
+    cpu_snapshot_path: &'a str,
+    memory_snapshot_path: &'a str,
     rpc_port: u16,
-    resume: bool,  
+    resume: bool,
 }
 
 #[derive(Deserialize, Debug)]
 #[serde(crate = "rocket::serde")]
 struct CreateRequest<'a> {
-    cpu_snapshot_path : &'a str,
-    memory_snapshot_path : &'a str,
+    cpu_snapshot_path: &'a str,
+    memory_snapshot_path: &'a str,
     kernel_path: &'a str,
     resume: bool,
 }
-
-
 
 async fn rpc_call(body: Json<SnapshotRequest<'_>>) -> anyhow::Result<String> {
     let socket = SocketAddr::new(IpAddr::V4(Ipv4Addr::new(127, 0, 0, 1)), body.rpc_port);
@@ -147,24 +98,26 @@ async fn rpc_call(body: Json<SnapshotRequest<'_>>) -> anyhow::Result<String> {
     let client = WorldClient::new(client::Config::default(), transport.await?).spawn();
     let hello = async move {
         // Send the request twice, just to be safe! ;)
-        if body.resume{
+        // if body.resume{
+        //     println!("Sending resume request");
+        //     tokio::select! {
+        //         hello1 = client.snapshot_and_resume(context::current(), body.cpu_snapshot_path.to_string(), body.memory_snapshot_path.to_string(), body.rpc_port) => { hello1 }
+        //         // hello2 = client.hello(context::current(), format!("{}2", "Ronak")) => { hello2 }
+        //     }
+        // }
+        // else{
+            println!("Sending pause request");
             tokio::select! {
-                hello1 = client.snapshot_and_resume(context::current(), body.cpu_snapshot_path.to_string(), body.memory_snapshot_path.to_string(), body.rpc_port) => { hello1 }
+                hello1 = client.snapshot_and_pause(context::current(), body.cpu_snapshot_path.to_string(), body.memory_snapshot_path.to_string(), body.rpc_port, body.resume) => { hello1 }
                 // hello2 = client.hello(context::current(), format!("{}2", "Ronak")) => { hello2 }
             }
-        }
-        else{
-            tokio::select! {
-                hello1 = client.snapshot_and_pause(context::current(), body.cpu_snapshot_path.to_string(), body.memory_snapshot_path.to_string(), body.rpc_port) => { hello1 }
-                // hello2 = client.hello(context::current(), format!("{}2", "Ronak")) => { hello2 }
-            }
-        }
+        // }
     }.await;
     match hello {
         Ok(s) => {
-            if s == "Success"{
+            if s == "Success" {
                 return Ok(s);
-            }else {
+            } else {
                 return Ok("Error".to_string());
             }
         }
@@ -175,33 +128,32 @@ async fn rpc_call(body: Json<SnapshotRequest<'_>>) -> anyhow::Result<String> {
 }
 // import env
 // use env;
-pub fn main () {
-    let func=std::env::args().nth(1).unwrap();
+pub fn main() {
+    let func = std::env::args().nth(1).unwrap();
     // if func is snapshot
-    if func == "pause"{
-        let cpu_snapshot_path = std::env::args().nth(2).unwrap();
-        let memory_snapshot_path = std::env::args().nth(3).unwrap();
-        let rpc_port = std::env::args().nth(4).unwrap().parse::<u16>().unwrap();
-        let resume = std::env::args().nth(5).unwrap().parse::<bool>().unwrap();
-        let body = Json(SnapshotRequest{
-            cpu_snapshot_path: &cpu_snapshot_path,
-            memory_snapshot_path: &memory_snapshot_path,
-            rpc_port: rpc_port,
-            resume: resume,
-        });
-        let result = tokio::runtime::Runtime::new().unwrap().block_on(rpc_call(body));
-        match result {
-            Ok(s) => {
-                if s == "Success"{
-                    println!("Success");
-                }else {
-                    println!("Error");
-                }
-            }
-            Err(_) => {
+    let cpu_snapshot_path = std::env::args().nth(2).unwrap();
+    let memory_snapshot_path = std::env::args().nth(3).unwrap();
+    let rpc_port = std::env::args().nth(4).unwrap().parse::<u16>().unwrap();
+    let resume = std::env::args().nth(5).unwrap().parse::<bool>().unwrap();
+    let body = Json(SnapshotRequest {
+        cpu_snapshot_path: &cpu_snapshot_path,
+        memory_snapshot_path: &memory_snapshot_path,
+        rpc_port: rpc_port,
+        resume: resume,
+    });
+    let result = tokio::runtime::Runtime::new()
+        .unwrap()
+        .block_on(rpc_call(body));
+    match result {
+        Ok(s) => {
+            if s == "Success" {
+                println!("Success");
+            } else {
                 println!("Error");
             }
         }
+        Err(_) => {
+            println!("Error");
+        }
     }
-
 }
