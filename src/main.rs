@@ -228,8 +228,8 @@ fn create(body: Json<CreateRequest<'_>>) -> Result<Json<CreateResponse>, MyError
                 .arg(body.memory_snapshot_path)
                 .arg("--port")
                 .arg(new_port)
-                .arg("--ip")
-                .arg(new_ip)
+//                 .arg("--ip")
+//                 .arg(new_ip)
                 .exec();
                 println!("Error: {}", err);
             },
@@ -255,8 +255,8 @@ fn create(body: Json<CreateRequest<'_>>) -> Result<Json<CreateResponse>, MyError
                 .arg(format!("path={}", body.kernel_path))
                 .arg("--port")
                 .arg(new_port)
-                .arg("--ip")
-                .arg(new_ip)
+//                 .arg("--ip")
+//                 .arg(new_ip)
                 .exec();
             },
             Ok(Fork::Parent(pid)) => {
