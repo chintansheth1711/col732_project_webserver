@@ -139,6 +139,13 @@ struct CreateRequest<'a> {
     resume: bool,
 }
 
+#[derive(Serialize, Debug)]
+#[serde(crate = "rocket::serde")]
+struct CreateResponse {
+    pid: i32,
+    port: i32
+}
+
 
 
 async fn rpc_call(body: Json<SnapshotRequest<'_>>) -> anyhow::Result<String> {
@@ -197,7 +204,7 @@ async fn snapshot(body: Json<SnapshotRequest<'_>>) -> Result<Json<&'_ str>, MyEr
 }
 
 #[post("/create", data = "<body>")]
-fn create(body: Json<CreateRequest<'_>>) -> Result<Json<String>, MyError> {
+fn create(body: Json<CreateRequest<'_>>) -> Result<Json<CreateResponse>, MyError> {
     println! ("OK responding for create request {:?}", body);
     // call to the function through rpc call 
     let new_ip = "127.0.0.1";
@@ -226,8 +233,9 @@ fn create(body: Json<CreateRequest<'_>>) -> Result<Json<String>, MyError> {
                 .exec();
                 println!("Error: {}", err);
             },
-            Ok(_) => {
-                return Ok(Json(new_port));
+            Ok(Fork::Parent(pid)) => {
+                println!("pid = {:?}", pid);
+                return Ok(Json(CreateResponse { pid, port: new_port.parse::<i32>().unwrap() }));
             },
             Err(e) => {
                 return Err(MyError::build(500, Some(format!("Forking failed: {}", e))));
@@ -251,8 +259,9 @@ fn create(body: Json<CreateRequest<'_>>) -> Result<Json<String>, MyError> {
                 .arg(new_ip)
                 .exec();
             },
-            Ok(_) => {
-                return Ok(Json(new_port));
+            Ok(Fork::Parent(pid)) => {
+                println!("pid = {:?}", pid);
+                return Ok(Json(CreateResponse { pid, port: new_port.parse::<i32>().unwrap() }));
             },
             Err(e) => {
                 return Err(MyError::build(500, Some(e.to_string())));
