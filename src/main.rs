@@ -7,7 +7,9 @@ use exec::Command;
 use std::{error::Error, net::SocketAddr, time::Duration, net::IpAddr, net::Ipv4Addr};
 use tarpc::{client, context, tokio_serde::formats::Json as newJson};
 use tokio::time::sleep;
-
+use std::fs::File;
+use std::io::Read;
+use std::io::Write;
 #[tarpc::service]
 pub trait World {
     /// Returns a greeting for name.
@@ -130,6 +132,28 @@ struct SnapshotRequest<'a> {
     resume: bool,  
 }
 
+/*
+sample request:
+{
+    "cpu_snapshot_path": "cpu.txt",
+    "memory_snapshot_path": "mem.txt",
+    "kernel_path": "../images/bzimage-hello-busybox", 
+    "resume": true,
+    "tap_device": "vmtap100",
+    "config":{
+        "username":"anirudha",
+        "password":"random",
+        "id":10
+    }
+}
+*/
+#[derive(Deserialize, Debug)]
+#[serde(crate = "rocket::serde")]
+struct Config {
+    username: String,
+    password: String,
+    id: u32,
+}
 #[derive(Deserialize, Debug)]
 #[serde(crate = "rocket::serde")]
 struct CreateRequest<'a> {
@@ -137,8 +161,9 @@ struct CreateRequest<'a> {
     memory_snapshot_path : &'a str,
     kernel_path: &'a str,
     resume: bool,
+    tap_device: &'a str,
+    config: Config,
 }
-
 
 
 async fn rpc_call(body: Json<SnapshotRequest<'_>>) -> anyhow::Result<String> {
@@ -242,9 +267,28 @@ fn create(body: Json<CreateRequest<'_>>) -> Result<Json<String>, MyError> {
         // note: return the IP, port as response
         match fork() {
             Ok(Fork::Child) => {
+                let myconfig = &body.config;
+                // create a config file from template.config.sh and save it in /tmp
+                let filename = format!("/tmp/config-{}", myconfig.id);
+                let mut file = File::create(&filename).unwrap();
+                // read template file with config
+                let mut template = File::open("template.config.sh").unwrap();
+                let mut contents = String::new();
+                template.read_to_string(&mut contents).unwrap();
+                // replace the placeholders with the values from the request
+                contents = contents.replace("{{username}}", &myconfig.username);
+                contents = contents.replace("{{password}}", &myconfig.password);
+                contents = contents.replace("{{id}}", &myconfig.id.to_string());
+                // ip = 192.168.{200+myconfig.id}.2
+                let ip = format!("192.168.{}.2", 200+myconfig.id);
+                contents = contents.replace("{{ip}}", &ip);
+
+                // write the config file
+                file.write_all(contents.as_bytes()).unwrap();
+                // execute the vmm binary
                 let err = exec::Command::new("../732-demo/target/debug/vmm-reference")
                 .arg("--kernel")
-                .arg(format!("path={}", body.kernel_path))
+                .arg(format!("path={},starter_file={}", body.kernel_path, filename))
                 .arg("--port")
                 .arg(new_port)
                 .arg("--ip")
