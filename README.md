@@ -187,9 +187,4 @@ Distributed under the MIT License. See
 ) for more information.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
-
-## Contact Contributors
-- [Sourav Sharma](mailto:souravsharma2468@gmail.com)
-- [Ronak Ladhar](mailto:ronak.ladhar@gmail.com)
-- [Chintan Sheth](mailto:shethchintan18@gmail.com)
  
