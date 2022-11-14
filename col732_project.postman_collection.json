@@ -13,7 +13,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"cpu_snapshot_path\" : \"<cpu_path>\", // if want to resume from existing VM\n    \"memory_snapshot_path\" : \"<memory_path>\", // if want to resume from existing VM\n    \"kernel_path\" : \"<kernel_image_path>\", // if want to create fresh VM from given kernel image\n    \"resume\": false // false if want to create a fresh VM, true if want to create a VM from existing snapshot\n}",
+					"raw": "{\n    \"cpu_snapshot_path\" : \"<cpu_path>\",\n    \"memory_snapshot_path\" : \"<memory_path>\",\n    \"kernel_path\" : \"../bzimage-hello-busybox\",\n    \"resume\": false \n}",
 					"options": {
 						"raw": {
 							"language": "json"
@@ -40,7 +40,7 @@
 				"header": [],
 				"body": {
 					"mode": "raw",
-					"raw": "{\n    \"cpu_snapshot_path\" : \"<cpu_path>\",\n    \"memory_snapshot_path\" : \"<memory_path>\",\n    \"rpc_port\": 37015,\n    \"resume\": true // true, if want to resume the VM after taking the snapshot, false if want to halt the VM after taking the snapshot\n}",
+					"raw": "{\n    \"cpu_snapshot_path\" : \"<cpu_path>\",\n    \"memory_snapshot_path\" : \"<memory_path>\",\n    \"rpc_port\": 34975,\n    \"resume\": true\n}",
 					"options": {
 						"raw": {
 							"language": "json"
